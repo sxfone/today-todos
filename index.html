@@ -381,17 +381,23 @@
   }
 
   // 调用数据库函数（所有权限校验都在数据库里完成）
-  function rpc(name, args) {
-    return fetch(SB_URL + '/rest/v1/rpc/' + name, {
-      method: 'POST',
-      headers: {
-        apikey: SB_KEY,
-        Authorization: 'Bearer ' + SB_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(args || {}),
-    }).then(function (response) {
-      return response.json().catch(function () { return {}; }).then(function (data) {
+  // 网络层失败自动重试（国内网络对 *.supabase.co 时通时断，重试可提高成功率）
+  async function rpc(name, args) {
+    var attempt = 0;
+    var lastError = null;
+    while (attempt < 3) {
+      attempt += 1;
+      try {
+        var response = await fetch(SB_URL + '/rest/v1/rpc/' + name, {
+          method: 'POST',
+          headers: {
+            apikey: SB_KEY,
+            Authorization: 'Bearer ' + SB_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(args || {}),
+        });
+        var data = await response.json().catch(function () { return {}; });
         if (!response.ok) {
           var message = (data && (data.message || data.error)) || '网络异常，请稍后再试';
           var error = new Error(message);
@@ -399,8 +405,14 @@
           throw error;
         }
         return data;
-      });
-    });
+      } catch (error) {
+        if (error && error.status) throw error;
+        lastError = error;
+        if (attempt < 3) await new Promise(function (resolve) { setTimeout(resolve, attempt * 600); });
+      }
+    }
+    var network = /fetch|network/i.test((lastError && lastError.message) || '');
+    throw new Error(network ? '连不上云端服务器，请检查网络（试试切换 WiFi 或流量）后重试' : '网络异常，请稍后再试');
   }
 
   function isExpired(error) {
