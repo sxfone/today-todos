@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>今日待办</title>
+<meta name="description" content="今日待办：工号登录，任务保存到云端，换手机也不丢。" />
+<meta name="theme-color" content="#f4f5f9" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%234b63ff'/%3E%3Cpath d='M19 33l9 9 18-19' fill='none' stroke='white' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #f4f5f9;
+    --surface: #ffffff;
+    --ink: #181b23;
+    --muted: #8a92a6;
+    --line: #e9ecf2;
+    --accent: #4b63ff;
+    --accent-2: #7a5af5;
+    --danger: #f5455c;
+    --shadow: 0 18px 46px rgba(24, 27, 35, .09);
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(12px, 3vw, 32px);
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    background:
+      radial-gradient(900px 420px at 8% -8%, #e9edff 0%, transparent 60%),
+      radial-gradient(820px 400px at 102% 4%, #e5fff7 0%, transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell { width: 100%; max-width: 560px; }
+  .view { display: none; }
+  .view.on { display: block; animation: rise .26s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 24px 22px 22px;
+  }
+
+  /* ---------- 品牌区 ---------- */
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 13px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    box-shadow: 0 10px 22px rgba(75, 99, 255, .30);
+  }
+  .logo svg { width: 22px; height: 22px; stroke: #fff; stroke-width: 2.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .brand h1 { margin: 0; font-size: 19px; letter-spacing: -.01em; }
+  .brand p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
+
+  /* ---------- 表单 ---------- */
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .field input {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: #f7f8fb;
+    border-radius: 12px;
+    padding: 12px 13px;
+    font-family: var(--font);
+    font-size: 16px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color .16s, box-shadow .16s, background .16s;
+  }
+  .field input::placeholder { color: #aab1bf; }
+  .field input:focus { background: #fff; border-color: #c9d0ff; box-shadow: 0 0 0 4px rgba(75, 99, 255, .10); }
+
+  .primary {
+    width: 100%; margin-top: 6px;
+    border: none; border-radius: 13px; padding: 13px;
+    font-family: var(--font); font-size: 15.5px; font-weight: 600; color: #fff;
+    background: linear-gradient(135deg, var(--accent), #6c5bf7);
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(75, 99, 255, .26);
+    transition: transform .12s, opacity .16s, box-shadow .16s;
+  }
+  .primary:active { transform: translateY(1px); }
+  .primary:disabled { opacity: .6; box-shadow: none; cursor: not-allowed; }
+
+  .form-error { min-height: 18px; margin: 8px 0 0; font-size: 12.5px; color: var(--danger); line-height: 1.45; }
+
+  .hint {
+    margin: 16px 0 0;
+    padding: 11px 13px;
+    background: #f7f8fb;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+  .hint b { color: var(--ink); font-weight: 600; }
+
+  .note { margin: 0 0 16px; font-size: 13.5px; color: #5d6577; line-height: 1.7; }
+
+  .text-btn {
+    border: none; background: transparent; color: var(--muted);
+    font-family: var(--font); font-size: 13px;
+    padding: 7px 9px; border-radius: 9px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .text-btn:hover { background: #f3f4f8; color: var(--ink); }
+  .text-btn.wide { display: block; width: 100%; margin-top: 14px; text-align: center; }
+
+  /* ---------- 待办页 ---------- */
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .head .date { margin: 0; font-size: 12.5px; color: var(--muted); letter-spacing: .02em; }
+  .head h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.01em; }
+
+  .hero {
+    position: relative;
+    margin-top: 18px;
+    padding: 18px 20px 16px;
+    border-radius: 18px;
+    color: #fff;
+    background: linear-gradient(135deg, #4b63ff 0%, #6a59f6 58%, #9360f0 100%);
+    overflow: hidden;
+  }
+  .hero::after {
+    content: "";
+    position: absolute; top: -74px; right: -52px;
+    width: 184px; height: 184px; border-radius: 50%;
+    background: rgba(255, 255, 255, .13);
+  }
+  .hero .h-label { margin: 0; font-size: 12.5px; opacity: .86; }
+  .hero .h-num { display: flex; align-items: baseline; gap: 7px; margin-top: 2px; }
+  .hero .h-num b { font-size: 40px; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .hero .h-num span { font-size: 13.5px; opacity: .9; }
+  .hero .h-tip { margin: 8px 0 0; font-size: 12.5px; opacity: .82; }
+
+  .add { display: flex; gap: 9px; margin: 16px 0 14px; }
+  .add input {
+    flex: 1; min-width: 0;
+    border: 1px solid var(--line);
+    background: #f7f8fb;
+    border-radius: 13px;
+    padding: 13px 14px;
+    font-family: var(--font); font-size: 16px; color: var(--ink);
+    outline: none;
+    transition: border-color .16s, box-shadow .16s, background .16s;
+  }
+  .add input::placeholder { color: #aab1bf; }
+  .add input:focus { background: #fff; border-color: #c9d0ff; box-shadow: 0 0 0 4px rgba(75, 99, 255, .10); }
+  .add button {
+    flex: 0 0 48px; width: 48px; height: 48px;
+    border: none; border-radius: 13px;
+    background: linear-gradient(135deg, var(--accent), #6c5bf7);
+    color: #fff; font-size: 26px; line-height: 1; font-family: var(--font);
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(75, 99, 255, .28);
+    transition: transform .12s, opacity .16s, box-shadow .16s;
+  }
+  .add button:active { transform: scale(.94); }
+  .add button:disabled { opacity: .38; box-shadow: none; cursor: not-allowed; transform: none; }
+
+  .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .task {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 10px 12px 13px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+    animation: pop .18s ease both;
+    transition: background .15s, border-color .15s, opacity .2s, transform .2s;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(-4px); } }
+  .task:hover { background: #fafbff; border-color: #e2e6f6; }
+  .task.done { background: #fafbfd; }
+
+  .check {
+    flex: 0 0 24px; width: 24px; height: 24px; padding: 0;
+    border-radius: 50%;
+    border: 1.8px solid #cdd2e0;
+    background: #fff;
+    display: grid; place-items: center;
+    cursor: pointer;
+    transition: background .16s, border-color .16s, transform .12s;
+  }
+  .check:active { transform: scale(.9); }
+  .check svg { width: 13px; height: 13px; stroke: #fff; stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(.5); transition: opacity .16s, transform .16s; }
+  .task.done .check { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
+  .task.done .check svg { opacity: 1; transform: scale(1); }
+
+  .txt { flex: 1; min-width: 0; font-size: 15px; line-height: 1.45; word-break: break-word; transition: color .16s; }
+  .task.done .txt { color: #a2a9bb; text-decoration: line-through; text-decoration-color: #c6cbd8; }
+
+  .del {
+    flex: 0 0 30px; width: 30px; height: 30px; padding: 0;
+    border: none; border-radius: 9px; background: transparent;
+    color: #c2c8d6; cursor: pointer;
+    display: grid; place-items: center;
+    opacity: 0;
+    transition: opacity .15s, background .15s, color .15s;
+  }
+  .task:hover .del { opacity: 1; }
+  .del:hover { background: #fff0f3; color: var(--danger); }
+  .del svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.1; fill: none; stroke-linecap: round; }
+
+  .empty { display: none; padding: 26px 6px 10px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.8; }
+  .empty.on { display: block; }
+  .empty .empty-mark { display: block; font-size: 18px; color: #d3d8e4; margin-bottom: 6px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
+    transform: translate(-50%, 16px);
+    max-width: 82vw;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: rgba(24, 27, 35, .93);
+    color: #fff; font-size: 13.5px; line-height: 1.5;
+    opacity: 0; pointer-events: none;
+    transition: opacity .22s, transform .22s;
+    z-index: 9;
+  }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 520px) {
+    body { padding: 12px 10px; padding-bottom: max(18px, env(safe-area-inset-bottom)); align-items: flex-start; }
+    .card { padding: 20px 16px 18px; border-radius: 20px; }
+    .head h2 { font-size: 19px; }
+    .hero .h-num b { font-size: 36px; }
+  }
+
+  @media (hover: none) {
+    .del { opacity: .5; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- 登录 -->
+  <section class="view" id="view-login">
+    <div class="card">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 12.5l5.2 5.2L20 6.6"/></svg>
+        </div>
+        <div>
+          <h1>今日待办</h1>
+          <p>登录后，任务自动保存到云端</p>
+        </div>
+      </div>
+
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="emp-no">工号</label>
+          <input id="emp-no" type="text" autocomplete="username" placeholder="例如 1001" enterkeyhint="next" />
+        </div>
+        <div class="field">
+          <label for="emp-name">姓名</label>
+          <input id="emp-name" type="text" autocomplete="name" placeholder="例如 张三" enterkeyhint="next" />
+        </div>
+        <div class="field">
+          <label for="emp-pw">密码</label>
+          <input id="emp-pw" type="password" autocomplete="current-password" placeholder="初始密码 123" enterkeyhint="go" />
+        </div>
+        <p class="form-error" id="login-error" role="alert"></p>
+        <button class="primary" id="login-btn" type="submit">登录</button>
+      </form>
+
+      <p class="hint">首次登录使用初始密码 <b>123</b>，登录后需要设置一个 6 位数字的新密码。没有工号请联系管理员开通。</p>
+    </div>
+  </section>
+
+  <!-- 首次登录：设置新密码 -->
+  <section class="view" id="view-password">
+    <div class="card">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 12.5l5.2 5.2L20 6.6"/></svg>
+        </div>
+        <div>
+          <h1>设置新密码</h1>
+          <p id="pw-who">—</p>
+        </div>
+      </div>
+
+      <p class="note">为了账号安全，请把初始密码改成 <b>6 位数字</b>（不能是 6 个相同的数字）。</p>
+
+      <form id="pw-form" novalidate>
+        <div class="field">
+          <label for="new-pw">新密码（6 位数字）</label>
+          <input id="new-pw" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••" enterkeyhint="next" />
+        </div>
+        <div class="field">
+          <label for="new-pw2">再输入一次</label>
+          <input id="new-pw2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••" enterkeyhint="done" />
+        </div>
+        <p class="form-error" id="pw-error" role="alert"></p>
+        <button class="primary" id="pw-btn" type="submit">保存并开始使用</button>
+      </form>
+
+      <button class="text-btn wide" id="pw-logout" type="button">不是我的账号？退出登录</button>
+    </div>
+  </section>
+
+  <!-- 待办清单 -->
+  <section class="view" id="view-todo">
+    <div class="card">
+      <div class="head">
+        <div>
+          <p class="date" id="today">—</p>
+          <h2 id="greeting">你好</h2>
+        </div>
+        <button class="text-btn" id="logout" type="button">退出</button>
+      </div>
+
+      <div class="hero">
+        <p class="h-label">今天还剩</p>
+        <div class="h-num"><b id="left">0</b><span>件待办</span></div>
+        <p class="h-tip" id="hero-tip">做完一件勾一件</p>
+      </div>
+
+      <form class="add" id="add-form" novalidate>
+        <input id="add-input" type="text" maxlength="200" autocomplete="off" enterkeyhint="done" placeholder="要做什么？例如：回复客户邮件" />
+        <button id="add-btn" type="submit" aria-label="添加任务" disabled>＋</button>
+      </form>
+
+      <ul class="list" id="list"></ul>
+      <div class="empty" id="empty">
+        <span class="empty-mark">—</span>
+        今天还没有任务<br />先加一件小事吧
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var state = { me: null, todos: [] };
+  var $ = function (id) { return document.getElementById(id); };
+
+  // 数据库地址与公开密钥（anon key 本来就是公开的，真正的权限由数据库函数校验）
+  var SB_URL = 'https://gfjwuxukairjppmfdwfe.supabase.co';
+  var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdmand1eHVrYWlyanBwbWZkd2ZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwODAxNjQsImV4cCI6MjEwODY1NjE2NH0.mmlB5S6-t4xSah5Wfk24wi6IgeuoANz6egGXFoGGXrY';
+  var TOKEN_KEY = 'td_token';
+
+  function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+  function setToken(value) {
+    if (value) localStorage.setItem(TOKEN_KEY, value);
+    else localStorage.removeItem(TOKEN_KEY);
+  }
+
+  function show(name) {
+    ['login', 'password', 'todo'].forEach(function (view) {
+      $('view-' + view).classList.toggle('on', view === name);
+    });
+  }
+
+  function toast(message) {
+    var node = $('toast');
+    node.textContent = message;
+    node.classList.add('on');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(function () { node.classList.remove('on'); }, 2600);
+  }
+
+  // 调用数据库函数（所有权限校验都在数据库里完成）
+  function rpc(name, args) {
+    return fetch(SB_URL + '/rest/v1/rpc/' + name, {
+      method: 'POST',
+      headers: {
+        apikey: SB_KEY,
+        Authorization: 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(args || {}),
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok) {
+          var message = (data && (data.message || data.error)) || '网络异常，请稍后再试';
+          var error = new Error(message);
+          error.status = response.status;
+          throw error;
+        }
+        return data;
+      });
+    });
+  }
+
+  function isExpired(error) {
+    return /登录已过期/.test((error && error.message) || '');
+  }
+
+  function backToLogin() {
+    setToken('');
+    state.me = null;
+    state.todos = [];
+    $('emp-pw').value = '';
+    show('login');
+  }
+
+  /* ------------------------- 顶部日期与问候 ------------------------- */
+
+  function paintHeader() {
+    var now = new Date();
+    var week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()];
+    $('today').textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日 · ' + week;
+
+    var hour = now.getHours();
+    var hello = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 13 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
+    $('greeting').textContent = hello + '，' + (state.me ? state.me.name : '');
+  }
+
+  /* ---------------------------- 待办渲染 ---------------------------- */
+
+  function render() {
+    var list = $('list');
+    list.textContent = '';
+    state.todos.forEach(function (todo) {
+      list.appendChild(item(todo));
+    });
+    updateSummary();
+  }
+
+  // 保持添加时的顺序：勾选只改状态、不移动位置，避免手指再点一次时误勾到别的任务
+  function updateSummary() {
+    var total = state.todos.length;
+    var left = state.todos.filter(function (t) { return !t.done; }).length;
+
+    $('empty').classList.toggle('on', total === 0);
+    $('left').textContent = left;
+    $('hero-tip').textContent = total > 0 && left === 0 ? '全部完成，收工' : '做完一件勾一件';
+    document.title = left > 0 ? '(' + left + ') 今日待办' : '今日待办';
+  }
+
+  function applyDone(node, todo) {
+    if (!node) return;
+    node.classList.toggle('done', !!todo.done);
+    var check = node.querySelector('.check');
+    if (check) {
+      check.setAttribute('aria-pressed', todo.done ? 'true' : 'false');
+      check.setAttribute('aria-label', todo.done ? '标记为未完成' : '标记为完成');
+    }
+  }
+
+  function item(todo) {
+    var li = document.createElement('li');
+    li.className = 'task' + (todo.done ? ' done' : '');
+    li.dataset.id = todo.id;
+
+    var check = document.createElement('button');
+    check.type = 'button';
+    check.className = 'check';
+    check.setAttribute('aria-label', todo.done ? '标记为未完成' : '标记为完成');
+    check.setAttribute('aria-pressed', todo.done ? 'true' : 'false');
+    check.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.6l4.4 4.4L19 7.4"/></svg>';
+    check.addEventListener('click', function () { toggle(todo); });
+
+    var text = document.createElement('span');
+    text.className = 'txt';
+    text.textContent = todo.text;
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', '删除任务');
+    del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    del.addEventListener('click', function () { remove(todo, li); });
+
+    li.appendChild(check);
+    li.appendChild(text);
+    li.appendChild(del);
+    return li;
+  }
+
+  /* ---------------------------- 数据操作 ---------------------------- */
+
+  function syncAddButton() {
+    $('add-btn').disabled = !$('add-input').value.trim();
+  }
+
+  async function loadTodos() {
+    try {
+      var data = await rpc('rpc_todos', { p_token: getToken() });
+      state.todos = data.todos || [];
+      render();
+    } catch (error) {
+      if (isExpired(error)) { backToLogin(); return; }
+      toast(error.message);
+    }
+  }
+
+  async function addTodo(event) {
+    event.preventDefault();
+    var input = $('add-input');
+    var text = input.value.trim();
+    if (!text) return;                       // 空白任务不添加
+
+    var button = $('add-btn');
+    button.disabled = true;
+    try {
+      var data = await rpc('rpc_todo_add', { p_token: getToken(), p_text: text });
+      state.todos.push(data.todo);
+      $('list').appendChild(item(data.todo));
+      input.value = '';
+      updateSummary();
+      input.focus();
+    } catch (error) {
+      if (isExpired(error)) { backToLogin(); return; }
+      toast(error.message);
+    } finally {
+      syncAddButton();
+    }
+  }
+
+  async function toggle(todo) {
+    var next = !todo.done;
+    var node = $('list').querySelector('.task[data-id="' + todo.id + '"]');
+    todo.done = next;
+    todo.done_at = next ? new Date().toISOString() : null;
+    applyDone(node, todo);
+    updateSummary();
+
+    try {
+      var data = await rpc('rpc_todo_toggle', { p_token: getToken(), p_id: todo.id, p_done: next });
+      Object.assign(todo, data.todo);
+      applyDone(node, todo);
+      updateSummary();
+    } catch (error) {
+      todo.done = !next;
+      todo.done_at = null;
+      applyDone(node, todo);
+      updateSummary();
+      if (isExpired(error)) { backToLogin(); return; }
+      toast(error.message);
+    }
+  }
+
+  async function remove(todo, node) {
+    try {
+      await rpc('rpc_todo_delete', { p_token: getToken(), p_id: todo.id });
+      state.todos = state.todos.filter(function (t) { return t.id !== todo.id; });
+      node.remove();
+      updateSummary();
+    } catch (error) {
+      if (isExpired(error)) { backToLogin(); return; }
+      toast(error.message);
+    }
+  }
+
+  /* ---------------------------- 页面流转 ---------------------------- */
+
+  async function enterTodo() {
+    paintHeader();
+    show('todo');
+    await loadTodos();
+  }
+
+  function showPassword() {
+    $('pw-who').textContent = state.me.name + ' · 工号 ' + state.me.empNo;
+    $('new-pw').value = '';
+    $('new-pw2').value = '';
+    $('pw-error').textContent = '';
+    show('password');
+  }
+
+  function logout() {
+    var token = getToken();
+    setToken('');
+    if (token) rpc('rpc_logout', { p_token: token }).catch(function () {});
+    state.me = null;
+    state.todos = [];
+    $('emp-pw').value = '';
+    $('login-error').textContent = '';
+    show('login');
+  }
+
+  /* ---------------------------- 事件绑定 ---------------------------- */
+
+  $('login-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    var errorNode = $('login-error');
+    errorNode.textContent = '';
+
+    var empNo = $('emp-no').value.trim();
+    var name = $('emp-name').value.trim();
+    var password = $('emp-pw').value;
+
+    if (!empNo || !name) { errorNode.textContent = '请填写工号和姓名'; return; }
+    if (!password) { errorNode.textContent = '请填写密码'; return; }
+
+    var button = $('login-btn');
+    button.disabled = true;
+    button.textContent = '登录中…';
+
+    try {
+      var me = await rpc('rpc_login', { p_emp_no: empNo, p_name: name, p_password: password });
+      setToken(me.token);
+      state.me = me;
+      localStorage.setItem('lastEmpNo', me.empNo);
+      $('emp-pw').value = '';
+      if (me.mustChange) showPassword(); else await enterTodo();
+    } catch (error) {
+      errorNode.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = '登录';
+    }
+  });
+
+  $('pw-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    var errorNode = $('pw-error');
+    errorNode.textContent = '';
+
+    var first = $('new-pw').value.trim();
+    var second = $('new-pw2').value.trim();
+
+    if (!/^\d{6}$/.test(first)) { errorNode.textContent = '新密码必须是 6 位数字'; return; }
+    if (/^(\d)\1{5}$/.test(first)) { errorNode.textContent = '密码不能是 6 个相同的数字'; return; }
+    if (first !== second) { errorNode.textContent = '两次输入的密码不一致'; return; }
+
+    var button = $('pw-btn');
+    button.disabled = true;
+    button.textContent = '保存中…';
+
+    try {
+      await rpc('rpc_change_password', { p_token: getToken(), p_password: first });
+      state.me.mustChange = false;
+      $('new-pw').value = '';
+      $('new-pw2').value = '';
+      toast('密码已设置');
+      await enterTodo();
+    } catch (error) {
+      errorNode.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = '保存并开始使用';
+    }
+  });
+
+  $('add-form').addEventListener('submit', addTodo);
+  $('add-input').addEventListener('input', syncAddButton);
+  $('logout').addEventListener('click', logout);
+  $('pw-logout').addEventListener('click', logout);
+
+  /* ---------------------------- 启动 ---------------------------- */
+
+  (async function boot() {
+    var remembered = localStorage.getItem('lastEmpNo');
+    if (remembered) $('emp-no').value = remembered;
+
+    if (!getToken()) { show('login'); return; }
+
+    try {
+      state.me = await rpc('rpc_me', { p_token: getToken() });
+      if (state.me.mustChange) showPassword(); else await enterTodo();
+    } catch (error) {
+      backToLogin();
+    }
+  })();
+})();
+</script>
+</body>
+</html>
